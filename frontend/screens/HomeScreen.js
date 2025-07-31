@@ -13,6 +13,7 @@ import {
   Dimensions,
   RefreshControl,
   ScrollView,
+  ImageBackground, // <-- BURAYA EKLE
 } from 'react-native';
 import { FontAwesome5, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import axios from 'axios';
@@ -325,120 +326,254 @@ export default function HomeScreen({ navigation }) {
     fetchSaved();
   }, [feed.length]);
 
+// Kart tasarımı için örnek (renderFeedItem fonksiyonunda kullan)
+const cardBaseStyle = {
+  backgroundColor: "#fff",
+  borderRadius: 24,
+  marginHorizontal: 23,
+  marginBottom: 20,
+  overflow: "hidden",
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.08,
+  shadowRadius: 8,
+  elevation: 2,
+};
+
 const renderFeedItem = ({ item }) => {
-  if (item.type === 'event') {
-    const isSaved = savedEventIds.has(item.id);
-    const isJoined = joinedEventIds.has(item.id);
-    const creatorClub = clubs.find(club => club.id === item.club_id);
-    const isOwner = item.creator_id && currentUserId && item.creator_id.toString() === currentUserId.toString();
-    return (
-      <TouchableOpacity activeOpacity={0.92} onPress={() => navigation.navigate('EventDetailScreen', { eventId: item.id })}>
-        <View style={styles.igCard}>
-          <View style={styles.igImageWrapper}>
-            <Image source={{ uri: item.image_url || item.image }} style={styles.igImage} />
-            <TouchableOpacity style={styles.igSaveButton} onPress={async () => {
-              try {
-                const userId = await getCurrentUserId();
-                if (!userId) {
-                  Alert.alert('Hata', 'Kullanıcı bilgisi alınamadı. Lütfen tekrar giriş yapın.');
-                  return;
-                }
-                if (isSaved) {
-                  await axios.delete(`${API_BASE_URL}/events/${item.id}/save`, { data: { user_id: userId } });
-                  setSavedEventIds(prev => new Set([...prev].filter(id => id !== item.id)));
-                } else {
-                  await axios.post(`${API_BASE_URL}/events/${item.id}/save`, { user_id: userId });
-                  setSavedEventIds(prev => new Set([...prev, item.id]));
-                }
-                fetchFeed();
-              } catch (err) {
-                Alert.alert('Kaydetme işlemi başarısız', err.response?.data?.error || err.message || 'İşlem başarısız.');
-              }
-            }}>
-              <Feather name={isSaved ? 'bookmark' : 'bookmark'} size={28} color={isSaved ? '#ea4c89' : '#fff'} />
-            </TouchableOpacity>
-            <View style={styles.igTypeBadge}>
-              <Feather name="calendar" size={18} color="#fff" />
-            </View>
+  const isEvent = item.type === 'event';
+  const isClub = item.type === 'club';
+  const isSaved = isEvent && savedEventIds.has(item.id);
+  const isJoined = isEvent && joinedEventIds.has(item.id);
+  const isOwner = isEvent && item.creator_id && currentUserId && item.creator_id.toString() === currentUserId.toString();
+  const city = isEvent
+    ? (item.location?.city || item.city || '-')
+    : (item.city || '-');
+  const date = isEvent
+    ? (item.date ? new Date(item.date).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" }) : "")
+    : (item.created_at ? new Date(item.created_at).toLocaleDateString("tr-TR") : "");
+  const imageUrl = isEvent
+    ? (item.image_url || item.image || "https://placehold.co/400x200/23234B/fff?text=Etkinlik")
+    : (item.cover_image || "https://placehold.co/400x200/23234B/fff?text=Kulüp");
+  const title = isEvent ? item.title : item.name;
+  const desc = isEvent ? item.description : item.description;
+  const category = item.category;
+  const participantCount = isEvent ? Math.max(1, item.participants?.length || 0) : (item.member_count ?? 1);
+  const eventCount = isClub ? events.filter(ev => ev.club_id === item.id).length : null;
+
+  // Kart rengi: etkinlik açık, kulüp koyu
+  const cardStyle = {
+    backgroundColor: isEvent ? "#fff" : "#23234B",
+    borderRadius: 24,
+    marginHorizontal: 23,
+    marginBottom: 20,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+  };
+
+  // Yazı rengi: etkinlikte koyu, kulüpte açık
+  const titleColor = isEvent ? "#23234B" : "#fff";
+  const descColor = isEvent ? "#23234B" : "#fff";
+  const metaColor = isEvent ? "#23234B" : "#fff";
+
+  return (
+    <View style={cardStyle}>
+      <Image
+        source={{ uri: imageUrl }}
+        style={{
+          width: "100%",
+          height: 180,
+          backgroundColor: "#eaeaea",
+        }}
+        resizeMode="cover"
+      />
+      <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 9 }}>
+          <View style={{ alignItems: "center", marginRight: 9 }}>
+            <Image
+              source={{ uri: imageUrl }}
+              style={{
+                width: 62,
+                height: 62,
+                borderRadius: 12,
+                backgroundColor: "#23234B"
+              }}
+              resizeMode="cover"
+            />
           </View>
-          <View style={styles.igContent}>
-            <Text style={styles.igTitle}>{item.title}</Text>
-            {creatorClub && (
-              <View style={styles.creatorClubRow}>
-                <FontAwesome5 name="users" size={14} color="#6c5ce7" />
-                <Text style={styles.creatorClubText}>{creatorClub.name}</Text>
-              </View>
-            )}
-            <Text style={styles.igDesc} numberOfLines={2}>{item.description}</Text>
-            <View style={styles.igMetaRow}>
-              {item.category && <View style={styles.igCategoryBadge}><Text style={styles.igCategoryText}>{item.category}</Text></View>}
-              {item.city && <Text style={styles.igMetaText}>{item.city}</Text>}
-              {item.date && <Text style={styles.igMetaText}>{new Date(item.date).toLocaleDateString()}</Text>}
-            </View>
-            <View style={styles.igFooterRow}>
-              <View style={styles.igParticipants}>
-                <MaterialCommunityIcons name="account-group" size={18} color="#6c5ce7" />
-                <Text style={styles.igParticipantsText}>{Math.max(1, item.participants?.length || 0)} kişi</Text>
-              </View>
-              {/* Katıl butonunu sadece sahibi değilse göster */}
-              {!isOwner && (
-                <TouchableOpacity
-                  style={[styles.igDetailButton, isJoined && { backgroundColor: '#b2bec3' }]}
-                  onPress={async (e) => {
-                    if (e && e.stopPropagation) e.stopPropagation();
-                    try {
-                      const userId = await getCurrentUserId();
-                      if (!userId) {
-                        Alert.alert('Hata', 'Kullanıcı bilgisi alınamadı. Lütfen tekrar giriş yapın.');
-                        return;
-                      }
-                      if (!isJoined) {
-                        await axios.post(`${API_BASE_URL}/events/${item.id}/join`, { user_id: userId });
-                        setJoinedEventIds(prev => new Set([...prev, item.id]));
-                      } else {
-                        await axios.delete(`${API_BASE_URL}/events/${item.id}/join`, { data: { user_id: userId } });
-                        setJoinedEventIds(prev => {
-                          const newSet = new Set([...prev]);
-                          newSet.delete(item.id);
-                          return newSet;
-                        });
-                      }
-                      fetchFeed();
-                    } catch (err) {
-                      Alert.alert('Katılım işlemi başarısız', err.response?.data?.error || err.message || 'İşlem başarısız.');
-                    }
-                  }}
-                >
-                  <Text style={styles.igDetailButtonText}>{isJoined ? 'Katıldın' : 'Katıl'}</Text>
-                </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: titleColor, fontSize: 22, fontWeight: "bold", marginBottom: 3 }}>
+              {title}
+            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              {category && (
+                <View style={{
+                  backgroundColor: "#8FA0D8",
+                  borderRadius: 15,
+                  paddingVertical: 4,
+                  paddingHorizontal: 10,
+                  marginRight: 9,
+                }}>
+                  <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>
+                    {category}
+                  </Text>
+                </View>
+              )}
+              <Text style={{
+                color: metaColor,
+                fontSize: 12,
+                fontWeight: "bold",
+                marginRight: 12,
+              }}>
+                {isEvent ? `${participantCount} kişi` : `${participantCount} üye`}
+              </Text>
+              {isClub && (
+                <View style={{
+                  backgroundColor: "#8FA0D8",
+                  borderRadius: 15,
+                  paddingVertical: 4,
+                  paddingHorizontal: 10,
+                }}>
+                  <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>
+                    {eventCount} Etkinlik
+                  </Text>
+                </View>
               )}
             </View>
           </View>
         </View>
-      </TouchableOpacity>
-    );
-  }
-  if (item.type === 'club') {
-    const getClubEventCount = (clubId) => events.filter(ev => ev.club_id === clubId).length;
-    return (
-      <View style={styles.clubCard}>
-        <Image source={{ uri: item.cover_image }} style={styles.clubImage} />
-        <View style={styles.clubContent}>
-          <Text style={styles.clubTitle}>{item.name}</Text>
-          <View style={styles.clubMetaRow}>
-            <Text style={styles.clubCategory}>{item.category}</Text>
-            <Text style={styles.clubMembers}>{(item.member_count ?? 1)} üye</Text>
-            <Text style={styles.clubEventCount}>{getClubEventCount(item.id)} etkinlik</Text>
-          </View>
-          <Text style={styles.clubDesc} numberOfLines={2}>{item.description}</Text>
-          <TouchableOpacity style={styles.clubButton} onPress={() => navigation.navigate('ClubDetail', { clubId: item.id })}>
-            <Text style={styles.clubButtonText}>Kulübe Git</Text>
-          </TouchableOpacity>
+        <View style={{ flexDirection: "row", marginHorizontal: 0 }}>
+          <Text style={{
+            color: descColor,
+            fontSize: 14,
+            fontWeight: "bold",
+            marginTop: 2,
+            flex: 1,
+          }}>
+            {desc}
+          </Text>
+          {isEvent && !isOwner && (
+            <TouchableOpacity
+              style={{
+                backgroundColor: isJoined ? "#b2bec3" : "#FF8502",
+                borderRadius: 17,
+                paddingVertical: 4,
+                paddingHorizontal: 14,
+                alignSelf: "flex-end",
+                marginLeft: 8,
+              }}
+              onPress={async (e) => {
+                if (e && e.stopPropagation) e.stopPropagation();
+                try {
+                  const userId = await getCurrentUserId();
+                  if (!userId) {
+                    Alert.alert('Hata', 'Kullanıcı bilgisi alınamadı. Lütfen tekrar giriş yapın.');
+                    return;
+                  }
+                  if (!isJoined) {
+                    await axios.post(`${API_BASE_URL}/events/${item.id}/join`, { user_id: userId });
+                    setJoinedEventIds(prev => new Set([...prev, item.id]));
+                  } else {
+                    await axios.delete(`${API_BASE_URL}/events/${item.id}/join`, { data: { user_id: userId } });
+                    setJoinedEventIds(prev => {
+                      const newSet = new Set([...prev]);
+                      newSet.delete(item.id);
+                      return newSet;
+                    });
+                  }
+                  fetchFeed();
+                } catch (err) {
+                  Alert.alert('Katılım işlemi başarısız', err.response?.data?.error || err.message || 'İşlem başarısız.');
+                }
+              }}
+            >
+              <Text style={{
+                color: "#fff",
+                fontSize: 16,
+                fontWeight: "bold",
+              }}>
+                {isJoined ? "Katıldın" : "Katıl"}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {isClub && (
+            <TouchableOpacity
+              style={{
+                backgroundColor: "#FF8502",
+                borderRadius: 17,
+                paddingVertical: 4,
+                paddingHorizontal: 14,
+                alignSelf: "flex-end",
+                marginLeft: 8,
+              }}
+              onPress={() => navigation.navigate('ClubDetail', { clubId: item.id })}
+            >
+              <Text style={{
+                color: "#fff",
+                fontSize: 16,
+                fontWeight: "bold",
+              }}>
+                Kulübe Git
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8 }}>
+          <Text style={{
+            color: metaColor,
+            fontSize: 12,
+            fontWeight: "bold",
+            flex: 1,
+          }}>
+            {city}
+          </Text>
+          <Text style={{
+            color: metaColor,
+            fontSize: 12,
+            fontWeight: "bold",
+            marginRight: 12,
+          }}>
+            {date}
+          </Text>
+          {isEvent && (
+            <TouchableOpacity
+              style={{
+                backgroundColor: "#FCA311",
+                borderRadius: 20,
+                padding: 5,
+                marginLeft: 8,
+              }}
+              onPress={async () => {
+                try {
+                  const userId = await getCurrentUserId();
+                  if (!userId) {
+                    Alert.alert('Hata', 'Kullanıcı bilgisi alınamadı. Lütfen tekrar giriş yapın.');
+                    return;
+                  }
+                  if (isSaved) {
+                    await axios.delete(`${API_BASE_URL}/events/${item.id}/save`, { data: { user_id: userId } });
+                    setSavedEventIds(prev => new Set([...prev].filter(id => id !== item.id)));
+                  } else {
+                    await axios.post(`${API_BASE_URL}/events/${item.id}/save`, { user_id: userId });
+                    setSavedEventIds(prev => new Set([...prev, item.id]));
+                  }
+                  fetchFeed();
+                } catch (err) {
+                  Alert.alert('Kaydetme işlemi başarısız', err.response?.data?.error || err.message || 'İşlem başarısız.');
+                }
+              }}
+            >
+              <Feather name={isSaved ? 'bookmark' : 'bookmark'} size={22} color={isSaved ? '#ea4c89' : '#fff'} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
-    );
-  }
-  return null;
+    </View>
+  );
 };
   if (loading) {
     return (
@@ -458,308 +593,482 @@ const renderFeedItem = ({ item }) => {
     );
   }
 
+  // Hero kartlar için gerçek veri seçimi
+  const heroEvent = feed.find(item => item.type === 'event');
+  const heroClub = feed.find(item => item.type === 'club');
+
   return (
-    <View style={styles.container}>
-      {/* Search bar ve filtre/sıralama butonları */}
-      <View style={styles.searchBarContainer}>
-        <Feather name="search" size={22} color="#666" style={{ marginHorizontal: 12 }} />
-        <TextInput
-          placeholder="Etkinlik, kulüp, şehir ara..."
-          style={styles.searchInput}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          clearButtonMode="while-editing"
-          placeholderTextColor="#999"
+  <View style={styles.container}>
+    <ScrollView
+      style={{ backgroundColor: "#fff" }}
+      contentContainerStyle={{ paddingBottom: 0 }}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Arama Barı */}
+      <TouchableOpacity
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          borderColor: "#0C0829",
+          borderRadius: 24,
+          borderWidth: 1,
+          paddingVertical: 8,
+          paddingHorizontal: 11,
+          marginTop: 58,
+          marginBottom: 20,
+          marginHorizontal: 23,
+          backgroundColor: "#fff",
+        }}
+        onPress={() => setFilterModalVisible(true)}
+      >
+        <Image
+          source={{ uri: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/vWIRdWhLXn/5jdamrhu_expires_30_days.png" }}
+          resizeMode={"stretch"}
+          style={{ width: 26, height: 29, marginRight: 16 }}
         />
-        <TouchableOpacity onPress={() => setFilterModalVisible(true)} style={styles.filterIcon}>
-          <Feather name="filter" size={22} color="#3897f0" />
+        <Text
+          style={{
+            color: "#000",
+            fontSize: 15,
+            flex: 1,
+          }}
+        >
+          Etkinlik, kulüp, şehir ara…
+        </Text>
+        <Image
+          source={{ uri: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/vWIRdWhLXn/gwpng84y_expires_30_days.png" }}
+          resizeMode={"stretch"}
+          style={{ width: 26, height: 16 }}
+        />
+      </TouchableOpacity>
+
+      {/* Filtre Butonları */}
+      <View style={{ flexDirection: "row", marginBottom: 24, marginLeft: 23 }}>
+        <TouchableOpacity
+          style={{
+            backgroundColor: "#FF8502",
+            borderRadius: 24,
+            paddingVertical: 5,
+            paddingHorizontal: 16,
+            marginRight: 6,
+          }}
+          onPress={() => setSortOption('date-desc')}
+        >
+          <Text style={{ color: "#fff", fontSize: 15, fontWeight: "bold" }}>Son Yüklenen</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => setSortModalVisible(true)} style={styles.filterIcon}>
-          <Feather name="sliders" size={22} color="#3897f0" />
+        <TouchableOpacity
+          style={{
+            backgroundColor: "#FF8502",
+            borderRadius: 24,
+            paddingVertical: 5,
+            paddingHorizontal: 18,
+            marginRight: 6,
+          }}
+          onPress={() => setSortOption('newest')}
+        >
+          <Text style={{ color: "#fff", fontSize: 15, fontWeight: "bold" }}>Yeni</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={{
+            backgroundColor: "#FF8502",
+            borderRadius: 24,
+            paddingVertical: 5,
+            paddingHorizontal: 17,
+            marginRight: 6,
+          }}
+          onPress={() => setSortOption('popular')}
+        >
+          <Text style={{ color: "#fff", fontSize: 15, fontWeight: "bold" }}>Popüler</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={{
+            backgroundColor: "#FF8502",
+            borderRadius: 24,
+            paddingVertical: 5,
+            paddingHorizontal: 18,
+          }}
+          onPress={() => setSortOption('all')}
+        >
+          <Text style={{ color: "#fff", fontSize: 15, fontWeight: "bold" }}>Hepsi</Text>
         </TouchableOpacity>
       </View>
-      <FlatList
-        data={sortedFeed}
-        keyExtractor={item => `${item.type}-${item.id}`}
-        renderItem={renderFeedItem}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 80, paddingTop: 10 }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#6c5ce7"]} />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Feather name="calendar" size={60} color="#ccc" />
-            <Text style={styles.emptyText}>Henüz içerik yok</Text>
-          </View>
-        }
-      />
 
-      {/* Filter Modal */}
-      <Modal
-        visible={filterModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setFilterModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.filterHeaderSticky}>
-              <Text style={styles.modalTitle}>Filtrele</Text>
-              <TouchableOpacity onPress={() => setFilterModalVisible(false)}>
-                <Feather name="x" size={26} color="#6c5ce7" />
-              </TouchableOpacity>
-            </View>
-            
-            <ScrollView>
-              <Text style={styles.sectionTitle}>Gösterim</Text>
-              <View style={styles.badgeRow}>
-                {typeOptions.map(option => (
-                  <TouchableOpacity
-                    key={option.value}
-                    style={[styles.badgeButton, showType === option.value && styles.badgeSelected]}
-                    onPress={() => setShowType(option.value)}
-                  >
-                    <Feather name={option.icon} size={16} color={showType === option.value ? '#fff' : '#6c5ce7'} />
-                    <Text style={[styles.badgeText, showType === option.value && styles.badgeTextSelected]}>{option.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              
-              {/* Şehir seçme */}
-              <Text style={styles.sectionTitle}>Şehir</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                <TouchableOpacity style={styles.citySelectButton} onPress={() => setCitySearchModalVisible(true)}>
-                  <Feather name="map-pin" size={18} color="#6c5ce7" />
-                  <Text style={styles.citySelectButtonText}>{selectedCity === 'all' ? 'Şehir Seç' : selectedCity}</Text>
-                </TouchableOpacity>
-              </View>
-              
-              {/* Kategoriler */}
-              <Text style={styles.sectionTitle}>Kategoriler</Text>
-              <ScrollView style={{ maxHeight: 220, marginBottom: 10 }}>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-                  <TouchableOpacity
-                    style={[
-                      styles.categoryBadge,
-                      selectedCategories.length === 0 && styles.categoryBadgeSelected
-                    ]}
-                    onPress={() => setSelectedCategories([])}
-                  >
-                    <Text style={[
-                      styles.categoryBadgeText,
-                      selectedCategories.length === 0 && styles.categoryBadgeTextSelected
-                    ]}>
-                      Tümü
-                    </Text>
-                  </TouchableOpacity>
-                  {CATEGORIES.map((category) => (
-                    <TouchableOpacity
-                      key={category.value}
-                      style={[
-                        styles.categoryBadge,
-                        selectedCategories.includes(category.value) && styles.categoryBadgeSelected
-                      ]}
-                      onPress={() => toggleCategory(category.value)}
-                    >
-                      <Text style={[
-                        styles.categoryBadgeText,
-                        selectedCategories.includes(category.value) && styles.categoryBadgeTextSelected
-                      ]}>
-                        {category.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </ScrollView>
-              
-              {/* Kulüp seçme */}
-              <Text style={styles.sectionTitle}>Kulüp</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
-                <View style={styles.badgeRow}>
-                  {clubOptions.filter(opt => filterSearch === '' || opt.label.toLowerCase().includes(filterSearch.toLowerCase())).map((option) => (
-                    <TouchableOpacity
-                      key={option.value}
-                      style={[styles.badgeButton, selectedClub === option.value && styles.badgeSelected]}
-                      onPress={() => setSelectedClub(option.value)}
-                    >
-                      <FontAwesome5 name="users" size={15} color={selectedClub === option.value ? '#fff' : '#6c5ce7'} />
-                      <Text style={[styles.badgeText, selectedClub === option.value && styles.badgeTextSelected]}>{option.label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </ScrollView>
-              
-              {/* Tarih aralığı */}
-              <Text style={styles.sectionTitle}>Tarih Aralığı</Text>
-              <View style={styles.dateRangeRow}>
-                <TouchableOpacity style={styles.dateInput} onPress={() => setShowFromPicker(true)}>
-                  <Feather name="calendar" size={16} color="#6c5ce7" />
-                  <Text style={styles.dateInputText}>{dateRange.from ? new Date(dateRange.from).toLocaleDateString() : 'Başlangıç'}</Text>
-                </TouchableOpacity>
-                <Text style={{ marginHorizontal: 8, color: '#888' }}>-</Text>
-                <TouchableOpacity style={styles.dateInput} onPress={() => setShowToPicker(true)}>
-                  <Feather name="calendar" size={16} color="#6c5ce7" />
-                  <Text style={styles.dateInputText}>{dateRange.to ? new Date(dateRange.to).toLocaleDateString() : 'Bitiş'}</Text>
-                </TouchableOpacity>
-              </View>
-              {showFromPicker && (
-                <DateTimePicker
-                  value={dateRange.from ? new Date(dateRange.from) : new Date()}
-                  mode="date"
-                  display="default"
-                  onChange={(e, selectedDate) => {
-                    setShowFromPicker(false);
-                    if (selectedDate) setDateRange(r => ({ ...r, from: selectedDate }));
-                  }}
-                />
-              )}
-              {showToPicker && (
-                <DateTimePicker
-                  value={dateRange.to ? new Date(dateRange.to) : new Date()}
-                  mode="date"
-                  display="default"
-                  onChange={(e, selectedDate) => {
-                    setShowToPicker(false);
-                    if (selectedDate) setDateRange(r => ({ ...r, to: selectedDate }));
-                  }}
-                />
-              )}
-              
-              {/* Katılım durumu */}
-              <Text style={styles.sectionTitle}>Katılım Durumu</Text>
-              <View style={styles.badgeRow}>
-                {STATUS_OPTIONS.map((option) => (
-                  <TouchableOpacity
-                    key={option.value}
-                    style={[styles.badgeButton, selectedStatus === option.value && styles.badgeSelected]}
-                    onPress={() => setSelectedStatus(option.value)}
-                  >
-                    <Feather name={option.value === 'joined' ? 'check-circle' : option.value === 'not-joined' ? 'x-circle' : 'circle'} size={16} color={selectedStatus === option.value ? '#fff' : '#3897f0'} />
-                    <Text style={[styles.badgeText, selectedStatus === option.value && styles.badgeTextSelected]}>{option.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              
-              {/* Popülerlik */}
-              <Text style={styles.sectionTitle}>Popülerlik</Text>
-              <View style={styles.badgeRow}>
-                {popularityOptions.map((option) => (
-                  <TouchableOpacity
-                    key={option.value}
-                    style={[styles.badgeButton, selectedPopularity === option.value && styles.badgeSelected]}
-                    onPress={() => setSelectedPopularity(option.value)}
-                  >
-                    <MaterialCommunityIcons name={option.value === 'popular' ? 'fire' : option.value === 'newest' ? 'clock-fast' : option.value === 'oldest' ? 'clock-outline' : 'star-outline'} size={16} color={selectedPopularity === option.value ? '#fff' : '#6c5ce7'} />
-                    <Text style={[styles.badgeText, selectedPopularity === option.value && styles.badgeTextSelected]}>{option.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              
-              <View style={styles.filterModalFooter}>
-                <TouchableOpacity style={styles.resetButton} onPress={() => {
-                  setSelectedCity('all'); 
-                  setSelectedCategory('all'); 
-                  setSelectedClub('all'); 
-                  setDateRange({ from: null, to: null }); 
-                  setSelectedStatus('all'); 
-                  setSelectedPopularity('all'); 
-                  setShowType('all'); 
-                  setFilterSearch(''); 
-                  setSelectedCategories([]);
-                }}>
-                  <Text style={styles.resetButtonText}>Sıfırla</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.applyButton} onPress={applyFilters}>
-                  <Text style={styles.applyButtonText}>Uygula</Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Sort Modal */}
-      <Modal
-        visible={sortModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSortModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Sıralama Seçenekleri</Text>
-            <View style={styles.badgeRow}>
-              {SORT_OPTIONS.map(option => (
-                <TouchableOpacity
-                  key={option.value}
-                  style={[styles.badgeButton, sortOption === option.value && styles.badgeSelected]}
-                  onPress={() => setSortOption(option.value)}
-                >
-                  <Text style={[styles.badgeText, sortOption === option.value && styles.badgeTextSelected]}>{option.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <View style={styles.filterModalFooter}>
-              <TouchableOpacity style={styles.applyButton} onPress={applySort}>
-                <Text style={styles.applyButtonText}>Uygula</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Şehir seçme modalı */}
-      <Modal
-        visible={citySearchModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setCitySearchModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Şehir Seç</Text>
-            <View style={styles.filterSearchRow}>
-              <Feather name="search" size={18} color="#6c5ce7" style={{ marginRight: 8 }} />
-              <TextInput
-                style={styles.filterSearchInput}
-                placeholder="Şehir ismi yaz..."
-                value={citySearch}
-                onChangeText={setCitySearch}
-                placeholderTextColor="#aaa"
+      {/* Hero Event Kartı (Gerçek veriyle) */}
+      {heroEvent && (
+        <ImageBackground
+          source={{ uri: heroEvent.image_url || heroEvent.image || "https://placehold.co/400x200/23234B/fff?text=Etkinlik" }}
+          resizeMode="cover"
+          style={{
+            paddingVertical: 12,
+            marginBottom: 20,
+            marginHorizontal: 23,
+            borderRadius: 20,
+            overflow: "hidden",
+          }}
+        >
+          <View style={{ flexDirection: "row", marginBottom: 80, marginHorizontal: 14 }}>
+            <View style={{ alignItems: "center", marginTop: 6, marginRight: 6 }}>
+              <Image
+                source={{ uri: heroEvent.image_url || heroEvent.image || "https://placehold.co/62x62/23234B/fff?text=E" }}
+                resizeMode="cover"
+                style={{ width: 33, height: 33, borderRadius: 8 }}
               />
             </View>
-            <ScrollView style={{ maxHeight: 300 }}>
-              {FILTER_OPTIONS.filter(opt => citySearch === '' || opt.label.toLowerCase().includes(citySearch.toLowerCase())).map(option => (
-                <TouchableOpacity
-                  key={option.value}
-                  style={[styles.badgeButton, selectedCity === option.value && styles.badgeSelected, { marginBottom: 8 }]}
-                  onPress={() => { setSelectedCity(option.value); setCitySearchModalVisible(false); }}
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <Text style={{ color: "#fff", fontSize: 22, fontWeight: "bold" }}>
+                {heroEvent.title}
+              </Text>
+              <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold", marginLeft: 1 }}>
+                {heroEvent.location?.city || heroEvent.city || "-"}
+              </Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", marginHorizontal: 16 }}>
+            <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold", flex: 1 }}>
+              {heroEvent.date ? new Date(heroEvent.date).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" }) : ""}
+            </Text>
+            <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>
+              {heroEvent.category}
+            </Text>
+          </View>
+        </ImageBackground>
+      )}
+
+      {/* Hero Club Kartı (Gerçek veriyle) */}
+      {heroClub && (
+        <View
+          style={{
+            backgroundColor: "#0A0827",
+            borderRadius: 17,
+            paddingVertical: 19,
+            marginBottom: 20,
+            marginHorizontal: 23,
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 9, marginLeft: 14 }}>
+            <View style={{ alignItems: "center", marginRight: 9 }}>
+              <Image
+                source={{ uri: heroClub.cover_image || "https://placehold.co/62x62/23234B/fff?text=K" }}
+                resizeMode="cover"
+                style={{ width: 62, height: 62, borderRadius: 12, backgroundColor: "#23234B" }}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  color: "#fff",
+                  fontSize: 22,
+                  fontWeight: "bold",
+                  marginBottom: 3,
+                  flexShrink: 1,
+                  flexWrap: "wrap",
+                  maxWidth: 220,
+                }}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {heroClub.name}
+              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                {heroClub.category && (
+                  <View
+                    style={{
+                      backgroundColor: "#8FA0D8",
+                      borderRadius: 15,
+                      paddingVertical: 4,
+                      paddingHorizontal: 10,
+                      marginRight: 9,
+                    }}
+                  >
+                    <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>
+                      {heroClub.category}
+                    </Text>
+                  </View>
+                )}
+                <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold", marginRight: 12 }}>
+                  {heroClub.member_count ?? "-"} üye
+                </Text>
+                <View
+                  style={{
+                    backgroundColor: "#8FA0D8",
+                    borderRadius: 15,
+                    paddingVertical: 4,
+                    paddingHorizontal: 10,
+                  }}
                 >
-                  <Feather name="map-pin" size={16} color={selectedCity === option.value ? '#fff' : '#6c5ce7'} />
-                  <Text style={[styles.badgeText, selectedCity === option.value && styles.badgeTextSelected]}>{option.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <TouchableOpacity style={styles.applyButton} onPress={() => setCitySearchModalVisible(false)}>
-              <Text style={styles.applyButtonText}>Kapat</Text>
+                  <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>
+                    {(events.filter(ev => ev.club_id === heroClub.id).length) || 0} Etkinlik
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+          <View style={{ flexDirection: "row", marginHorizontal: 14 }}>
+            <Text style={{ color: "#fff", fontSize: 14, fontWeight: "bold", marginTop: 2, flex: 1 }}>
+              {heroClub.description}
+            </Text>
+            <TouchableOpacity
+              style={{
+                backgroundColor: "#FF8502",
+                borderRadius: 17,
+                paddingVertical: 4,
+                paddingHorizontal: 14,
+              }}
+              onPress={() => navigation.navigate('ClubDetail', { clubId: heroClub.id })}
+            >
+              <Text style={{ color: "#fff", fontSize: 20, fontWeight: "bold" }}>Kulübe Git</Text>
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
-    </View>
+      )}
+
+      {/* Kulüp Listesi */}
+      {clubs.length > 0 && (
+  <View style={{ marginBottom: 24 }}>
+    <Text style={{ color: "#fff", fontSize: 20, fontWeight: "bold", marginLeft: 23, marginBottom: 10 }}>
+      Tüm Kulüpler
+    </Text>
+    {clubs
+      .filter(club => !heroClub || club.id !== heroClub.id) // Hero club'ı listeden çıkar
+      .map(club => (
+        <View
+          key={club.id}
+          style={{
+            backgroundColor: "#0A0827",
+            borderRadius: 17,
+            paddingVertical: 19,
+            marginBottom: 20,
+            marginHorizontal: 23,
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 9, marginLeft: 14 }}>
+            <View style={{ alignItems: "center", marginRight: 9 }}>
+              <Image
+                source={{ uri: club.cover_image || "https://placehold.co/62x62/23234B/fff?text=K" }}
+                resizeMode="cover"
+                style={{ width: 62, height: 62, borderRadius: 12, backgroundColor: "#23234B" }}
+              />
+            </View>
+            <View>
+              <Text style={{ color: "#fff", fontSize: 22, fontWeight: "bold", marginBottom: 3, flexShrink: 1, flexWrap: "wrap", maxWidth: 220 }} numberOfLines={1} ellipsizeMode="tail">
+                {club.name}
+              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                {club.category && (
+                  <View style={{
+                    backgroundColor: "#8FA0D8",
+                    borderRadius: 15,
+                    paddingVertical: 4,
+                    paddingHorizontal: 10,
+                    marginRight: 9,
+                  }}>
+                    <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>
+                      {club.category}
+                    </Text>
+                  </View>
+                )}
+                <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold", marginRight: 12 }}>
+                  {club.member_count ?? "-"} üye
+                </Text>
+                <View style={{
+                  backgroundColor: "#8FA0D8",
+                  borderRadius: 15,
+                  paddingVertical: 4,
+                  paddingHorizontal: 10,
+                }}>
+                  <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>
+                    {(events.filter(ev => ev.club_id === club.id).length) || 0} Etkinlik
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+          <View style={{ flexDirection: "row", marginHorizontal: 14 }}>
+            <Text style={{ color: "#fff", fontSize: 14, fontWeight: "bold", marginTop: 2, flex: 1 }}>
+              {club.description}
+            </Text>
+            <TouchableOpacity
+              style={{
+                backgroundColor: "#FF8502",
+                borderRadius: 17,
+                paddingVertical: 4,
+                paddingHorizontal: 14,
+              }}
+              onPress={() => navigation.navigate('ClubDetail', { clubId: club.id })}
+            >
+              <Text style={{ color: "#fff", fontSize: 20, fontWeight: "bold" }}>Kulübe Git</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ))}
+  </View>
+)}
+
+      {/* Akış: Hero kartlar hariç tüm kulüp ve etkinlikler */}
+      {feed
+        .filter(item =>
+          // Hero club ve hero event hariç tümünü göster
+          (!heroClub || item.id !== heroClub.id || item.type !== 'club') &&
+          (!heroEvent || item.id !== heroEvent.id || item.type !== 'event')
+        )
+        .map(item => (
+          <View key={item.type + '-' + item.id}>
+            {item.type === 'club' ? (
+              // Kulüp kartı
+              <View
+                style={{
+                  backgroundColor: "#0A0827",
+                  borderRadius: 17,
+                  paddingVertical: 19,
+                  marginBottom: 20,
+                  marginHorizontal: 23,
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 9, marginLeft: 14 }}>
+                  <View style={{ alignItems: "center", marginRight: 9 }}>
+                    <Image
+                      source={{ uri: item.cover_image || "https://placehold.co/62x62/23234B/fff?text=K" }}
+                      resizeMode="cover"
+                      style={{ width: 62, height: 62, borderRadius: 12, backgroundColor: "#23234B" }}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        color: "#fff",
+                        fontSize: 22,
+                        fontWeight: "bold",
+                        marginBottom: 3,
+                        flexShrink: 1,
+                        flexWrap: "wrap",
+                        maxWidth: 220,
+                      }}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {item.name}
+                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      {item.category && (
+                        <View
+                          style={{
+                            backgroundColor: "#8FA0D8",
+                            borderRadius: 15,
+                            paddingVertical: 4,
+                            paddingHorizontal: 10,
+                            marginRight: 9,
+                          }}
+                        >
+                          <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>
+                            {item.category}
+                          </Text>
+                        </View>
+                      )}
+                      <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold", marginRight: 12 }}>
+                        {item.member_count ?? "-"} üye
+                      </Text>
+                      <View
+                        style={{
+                          backgroundColor: "#8FA0D8",
+                          borderRadius: 15,
+                          paddingVertical: 4,
+                          paddingHorizontal: 10,
+                        }}
+                      >
+                        <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>
+                          {(events.filter(ev => ev.club_id === item.id).length) || 0} Etkinlik
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+                <View style={{ flexDirection: "row", marginHorizontal: 14 }}>
+                  <Text style={{ color: "#fff", fontSize: 14, fontWeight: "bold", marginTop: 2, flex: 1 }}>
+                    {item.description}
+                  </Text>
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: "#FF8502",
+                      borderRadius: 17,
+                      paddingVertical: 4,
+                      paddingHorizontal: 14,
+                    }}
+                    onPress={() => navigation.navigate('ClubDetail', { clubId: item.id })}
+                  >
+                    <Text style={{ color: "#fff", fontSize: 20, fontWeight: "bold" }}>Kulübe Git</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              // Etkinlik kartı
+              <View
+                style={{
+                  backgroundColor: "#fff",
+                  borderRadius: 17,
+                  paddingVertical: 19,
+                  marginBottom: 20,
+                  marginHorizontal: 23,
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.08,
+                  shadowRadius: 8,
+                  elevation: 2,
+                }}
+              >
+                <Image
+                  source={{ uri: item.image_url || item.image || "https://placehold.co/400x200/23234B/fff?text=Etkinlik" }}
+                  resizeMode="cover"
+                  style={{ width: "100%", height: 180, borderRadius: 12, marginBottom: 10 }}
+                />
+                <View style={{ paddingHorizontal: 16 }}>
+                  <Text style={{ color: "#23234B", fontSize: 22, fontWeight: "bold", marginBottom: 3 }}>
+                    {item.title}
+                  </Text>
+                  <Text style={{ color: "#23234B", fontSize: 14, fontWeight: "bold", marginBottom: 6 }}>
+                    {item.location?.city || item.city || "-"}
+                  </Text>
+                  <Text style={{ color: "#23234B", fontSize: 14, marginBottom: 6 }}>
+                    {item.date ? new Date(item.date).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" }) : ""}
+                  </Text>
+                  <Text style={{ color: "#23234B", fontSize: 14, marginBottom: 6 }}>
+                    {item.category}
+                  </Text>
+                  <Text style={{ color: "#23234B", fontSize: 14, marginBottom: 6 }}>
+                    {item.description}
+                  </Text>
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: "#FF8502",
+                      borderRadius: 17,
+                      paddingVertical: 4,
+                      paddingHorizontal: 14,
+                      alignSelf: "flex-end",
+                      marginTop: 8,
+                    }}
+                    onPress={() => navigation.navigate('EventDetail', { eventId: item.id })}
+                  >
+                    <Text style={{ color: "#fff", fontSize: 16, fontWeight: "bold" }}>Detay</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </View>
+        ))}
+    </ScrollView>
+    {/* ... */}
+  </View>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#18183A', // Koyu arka plan
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#18183A',
   },
   searchBarContainer: {
     flexDirection: 'row',
@@ -767,7 +1076,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     marginTop: 24,
     marginBottom: 14,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#23234B', // Koyu bar
     borderRadius: 30,
     paddingHorizontal: 12,
     height: 46,
@@ -775,19 +1084,19 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#222',
+    color: '#fff',
   },
   filterIcon: {
     marginLeft: 16,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
     paddingHorizontal: 24,
   },
   modalContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: '#23234B',
     borderRadius: 18,
     paddingVertical: 20,
     paddingHorizontal: 18,
@@ -797,14 +1106,14 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     marginBottom: 16,
-    color: '#3897f0',
+    color: '#FCA311',
     textAlign: 'center',
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
     marginVertical: 8,
-    color: '#333',
+    color: '#fff',
   },
   filterHeaderSticky: { 
     flexDirection: 'row', 
@@ -812,13 +1121,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between', 
     marginBottom: 10, 
     borderBottomWidth: 1, 
-    borderColor: '#f1f3f5', 
+    borderColor: '#23234B', 
     paddingBottom: 8 
   },
   filterSearchRow: { 
     flexDirection: 'row', 
     alignItems: 'center', 
-    backgroundColor: '#f1f3f5', 
+    backgroundColor: '#18183A', 
     borderRadius: 14, 
     paddingHorizontal: 10, 
     marginBottom: 14, 
@@ -827,7 +1136,7 @@ const styles = StyleSheet.create({
   filterSearchInput: { 
     flex: 1, 
     fontSize: 15, 
-    color: '#333' 
+    color: '#fff' 
   },
   badgeRow: {
     flexDirection: 'row',
@@ -838,30 +1147,30 @@ const styles = StyleSheet.create({
   badgeButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f1f3f5',
+    backgroundColor: '#23234B',
     borderRadius: 20,
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#23234B',
   },
   badgeSelected: {
-    backgroundColor: '#3897f0',
-    borderColor: '#3897f0',
+    backgroundColor: '#FCA311',
+    borderColor: '#FCA311',
   },
   badgeText: {
     fontSize: 14,
-    color: '#6c5ce7',
+    color: '#fff',
     marginLeft: 6,
   },
   badgeTextSelected: {
-    color: '#fff',
+    color: '#23234B',
     fontWeight: '700',
   },
   dateRangeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f1f3f5',
+    backgroundColor: '#23234B',
     borderRadius: 14,
     paddingHorizontal: 10,
     paddingVertical: 8,
@@ -870,16 +1179,16 @@ const styles = StyleSheet.create({
   dateInput: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#18183A',
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#23234B',
   },
   dateInputText: {
     fontSize: 15,
-    color: '#333',
+    color: '#fff',
     marginLeft: 8,
   },
   filterModalFooter: {
@@ -887,37 +1196,37 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     marginTop: 20,
     borderTopWidth: 1,
-    borderColor: '#f1f3f5',
+    borderColor: '#23234B',
     paddingTop: 15,
   },
   resetButton: {
     flex: 1,
-    backgroundColor: '#f1f3f5',
+    backgroundColor: '#23234B',
     borderRadius: 20,
     paddingVertical: 12,
     alignItems: 'center',
   },
   resetButtonText: {
-    color: '#6c5ce7',
+    color: '#FCA311',
     fontWeight: '700',
     fontSize: 16,
   },
   applyButton: {
     flex: 1,
-    backgroundColor: '#3897f0',
+    backgroundColor: '#FCA311',
     borderRadius: 20,
     paddingVertical: 12,
     alignItems: 'center',
   },
   applyButtonText: {
-    color: '#fff',
+    color: '#23234B',
     fontWeight: '700',
     fontSize: 16,
   },
   citySelectButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f1f3f5',
+    backgroundColor: '#23234B',
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 7,
@@ -925,14 +1234,14 @@ const styles = StyleSheet.create({
     borderWidth: 0,
   },
   citySelectButtonText: {
-    color: '#6c5ce7',
+    color: '#FCA311',
     fontWeight: '700',
     marginLeft: 8,
     fontSize: 15,
   },
   // Kategori badge stilleri
   categoryBadge: {
-    backgroundColor: '#f1f3f5',
+    backgroundColor: '#23234B',
     borderRadius: 16,
     paddingVertical: 8,
     paddingHorizontal: 14,
@@ -940,25 +1249,25 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   categoryBadgeSelected: {
-    backgroundColor: '#6c5ce7',
+    backgroundColor: '#FCA311',
   },
   categoryBadgeText: {
     fontSize: 14,
-    color: '#333',
+    color: '#fff',
   },
   categoryBadgeTextSelected: {
-    color: '#fff',
+    color: '#23234B',
     fontWeight: '600',
   },
   // Kart stilleri
   clubCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#23234B',
     borderRadius: 18,
     marginHorizontal: 16,
     marginBottom: 18,
-    shadowColor: '#6c5ce7',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.18,
     shadowRadius: 8,
     elevation: 3,
     flexDirection: 'row',
@@ -969,7 +1278,7 @@ const styles = StyleSheet.create({
     height: 100,
     borderTopLeftRadius: 18,
     borderBottomLeftRadius: 18,
-    backgroundColor: '#f1f3f5',
+    backgroundColor: '#18183A',
   },
   clubContent: {
     flex: 1,
@@ -979,7 +1288,7 @@ const styles = StyleSheet.create({
   clubTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#6c5ce7',
+    color: '#FCA311',
     marginBottom: 4,
   },
   clubMetaRow: {
@@ -989,8 +1298,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   clubCategory: {
-    backgroundColor: '#e5e7eb',
-    color: '#6c5ce7',
+    backgroundColor: '#18183A',
+    color: '#FCA311',
     fontWeight: '700',
     fontSize: 13,
     borderRadius: 8,
@@ -999,12 +1308,12 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   clubMembers: {
-    color: '#888',
+    color: '#fff',
     fontSize: 13,
   },
   clubEventCount: {
-    backgroundColor: '#e5e7eb',
-    color: '#6c5ce7',
+    backgroundColor: '#18183A',
+    color: '#FCA311',
     fontWeight: '700',
     fontSize: 13,
     borderRadius: 8,
@@ -1013,19 +1322,19 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   clubDesc: {
-    color: '#444',
+    color: '#fff',
     fontSize: 14,
     marginBottom: 8,
   },
   clubButton: {
-    backgroundColor: '#ea4c89',
+    backgroundColor: '#FCA311',
     borderRadius: 12,
     paddingVertical: 8,
     paddingHorizontal: 18,
     alignSelf: 'flex-start',
   },
   clubButtonText: {
-    color: '#fff',
+    color: '#23234B',
     fontWeight: '700',
     fontSize: 15,
   },
@@ -1036,18 +1345,18 @@ const styles = StyleSheet.create({
   },
   creatorClubText: {
     marginLeft: 6,
-    color: '#6c5ce7',
+    color: '#FCA311',
     fontSize: 14,
     fontWeight: '600',
   },
   igCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#23234B',
     borderRadius: 18,
     marginHorizontal: 16,
     marginBottom: 18,
-    shadowColor: '#6c5ce7',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.18,
     shadowRadius: 8,
     elevation: 3,
     overflow: 'hidden',
@@ -1067,7 +1376,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 10,
     right: 10,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: '#FCA311',
     borderRadius: 20,
     padding: 5,
   },
@@ -1075,7 +1384,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 10,
     left: 10,
-    backgroundColor: '#6c5ce7',
+    backgroundColor: '#FCA311',
     borderRadius: 15,
     paddingVertical: 4,
     paddingHorizontal: 10,
@@ -1086,11 +1395,11 @@ const styles = StyleSheet.create({
   igTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#ea4c89',
+    color: '#FCA311',
     marginBottom: 4,
   },
   igDesc: {
-    color: '#444',
+    color: '#fff',
     fontSize: 14,
     marginBottom: 8,
   },
@@ -1101,18 +1410,18 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   igCategoryBadge: {
-    backgroundColor: '#e5e7eb',
+    backgroundColor: '#18183A',
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 2,
   },
   igCategoryText: {
-    color: '#6c5ce7',
+    color: '#FCA311',
     fontWeight: '700',
     fontSize: 13,
   },
   igMetaText: {
-    color: '#888',
+    color: '#fff',
     fontSize: 13,
   },
   igFooterRow: {
@@ -1123,25 +1432,25 @@ const styles = StyleSheet.create({
   igParticipants: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f1f3f5',
+    backgroundColor: '#18183A',
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
   igParticipantsText: {
     marginLeft: 6,
-    color: '#6c5ce7',
+    color: '#FCA311',
     fontWeight: '700',
     fontSize: 13,
   },
   igDetailButton: {
-    backgroundColor: '#6c5ce7',
+    backgroundColor: '#FCA311',
     borderRadius: 12,
     paddingVertical: 8,
     paddingHorizontal: 18,
   },
   igDetailButtonText: {
-    color: '#fff',
+    color: '#23234B',
     fontWeight: '700',
     fontSize: 15,
   },
@@ -1154,13 +1463,14 @@ const styles = StyleSheet.create({
   emptyText: {
     marginTop: 16,
     fontSize: 18,
-    color: '#888',
+    color: '#fff',
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    backgroundColor: '#18183A',
   },
   errorText: {
     fontSize: 16,
@@ -1169,14 +1479,87 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   retryButton: {
-    backgroundColor: '#6c5ce7',
+    backgroundColor: '#FCA311',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
   },
   retryButtonText: {
-    color: '#fff',
+    color: '#23234B',
     fontWeight: '600',
     fontSize: 16,
   },
 });
+
+// Alt bar ve modal için örnek
+function FloatingActionBar({ onCreateEvent, onCreateClub }) {
+  const [modalVisible, setModalVisible] = React.useState(false);
+  return (
+    <>
+      <TouchableOpacity
+        style={{
+          position: "absolute",
+          bottom: 32,
+          alignSelf: "center",
+          backgroundColor: "#FF8502",
+          width: 64,
+          height: 64,
+          borderRadius: 32,
+          justifyContent: "center",
+          alignItems: "center",
+          shadowColor: "#000",
+          shadowOpacity: 0.15,
+          shadowRadius: 8,
+          elevation: 4,
+          zIndex: 10,
+        }}
+        onPress={() => setModalVisible(true)}
+      >
+        <Feather name="plus" size={32} color="#fff" />
+      </TouchableOpacity>
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.18)",
+            justifyContent: "flex-end",
+          }}
+          activeOpacity={1}
+          onPress={() => setModalVisible(false)}
+        >
+          <View
+            style={{
+              backgroundColor: "#fff",
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              padding: 24,
+              marginHorizontal: 10,
+              marginBottom: 24,
+              elevation: 8,
+            }}
+          >
+            <TouchableOpacity
+              style={{ flexDirection: "row", alignItems: "center", marginBottom: 18 }}
+              onPress={() => { setModalVisible(false); onCreateEvent && onCreateEvent(); }}
+            >
+              <Feather name="user" size={22} color="#6c5ce7" style={{ marginRight: 12 }} />
+              <Text style={{ fontSize: 17, color: "#23234B" }}>Etkinlik Oluştur</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ flexDirection: "row", alignItems: "center" }}
+              onPress={() => { setModalVisible(false); onCreateClub && onCreateClub(); }}
+            >
+              <Feather name="users" size={22} color="#6c5ce7" style={{ marginRight: 12 }} />
+              <Text style={{ fontSize: 17, color: "#23234B" }}>Kulüp Oluştur</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </>
+  );
+}

@@ -73,7 +73,7 @@ export default function RegisterScreen({ navigation }) {
       const data = response.data;
 
       // EKLE!
-      await AsyncStorage.setItem('user_id', data.user.id);
+      await AsyncStorage.setItem('user_id', String(data.user.id));
 
       Alert.alert(
         'Başarılı',

@@ -11,5 +11,5 @@ export const getCurrentUserToken = () => {
 };
 
 // API base URL (tüm isteklerde kullanılacak)
-export const API_BASE_URL = "http://192.168.1.78:3000";
-export const AUTH_API_URL = 'http://192.168.1.78:3000/api/auth';
+export const API_BASE_URL = "http://192.168.88.236:3000";
+export const AUTH_API_URL = 'http://192.168.88.236:3000/api/auth';

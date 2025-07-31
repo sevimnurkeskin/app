@@ -11,7 +11,18 @@ import { MaterialIcons, MaterialCommunityIcons, Ionicons } from '@expo/vector-ic
 import { API_BASE_URL, getCurrentUserId } from '../auth';
 
 const screenWidth = Dimensions.get('window').width;
-
+const cleanCategoryName = (name) => {
+  const cleaned = name.toLowerCase()
+    .replace(/i̇/g, 'i') // Özel İ harfi için
+    .replace(/ı/g, 'i')
+    .replace(/ğ/g, 'g')
+    .replace(/ü/g, 'u')
+    .replace(/ş/g, 's')
+    .replace(/ö/g, 'o')
+    .replace(/ç/g, 'c')
+    .replace(/\s/g, ''); // Boşlukları kaldır
+  return cleaned;
+};
 const CATEGORY_COLORS = [
   '#ea4c89', '#5f6caf', '#f7b731', '#20bf6b', '#8854d0', '#fd9644', '#26de81', '#2d98da', '#eb3b5a', '#45aaf2'
 ];
@@ -27,13 +38,13 @@ const SUBCATEGORIES = {
   kitap: ['Roman', 'Şiir', 'Kişisel Gelişim', 'Felsefe', 'Bilim Kurgu', 'Tartışma', 'Okuma Grubu', 'Yazar Buluşması', 'Diğer'],
   oyun: ['Bilgisayar Oyunları', 'Konsol Oyunları', 'Masaüstü Oyunlar', 'Mobil Oyunlar', 'Turnuva', 'Satranç', 'Zeka Oyunları', 'Diğer'],
   muzik: ['Rock', 'Pop', 'Caz', 'Klasik', 'Rap', 'Elektronik', 'Türk Halk', 'Enstrümantal', 'Konser', 'Jam Session', 'Diğer'],
-  dogal: ['Kamp', 'Doğa Yürüyüşü', 'Çevre Temizliği', 'Bahçe', 'Ekoloji', 'Hayvanlar', 'Gönüllülük', 'Diğer'],
+  doga: ['Kamp', 'Doğa Yürüyüşü', 'Çevre Temizliği', 'Bahçe', 'Ekoloji', 'Hayvanlar', 'Gönüllülük', 'Diğer'],
   seyahat: ['Kültür Turu', 'Doğa Gezisi', 'Yurtdışı', 'Şehir Turu', 'Kamp', 'Gezi Planlama', 'Diğer'],
   yemek: ['Dünya Mutfağı', 'Tatlı', 'Vegan', 'Deniz Ürünleri', 'Hamur İşi', 'Mutfak Atölyesi', 'Yemek Yarışması', 'Diğer'],
-  gelisim: ['Motivasyon', 'Psikoloji', 'Kariyer', 'Sağlık', 'Zihin Haritalama', 'Meditasyon', 'Workshop', 'Diğer'],
+  kisiselgelisim: ['Motivasyon', 'Psikoloji', 'Kariyer', 'Sağlık', 'Zihin Haritalama', 'Meditasyon', 'Workshop', 'Diğer'],
   bilim: ['Fizik', 'Kimya', 'Biyoloji', 'Matematik', 'Teknoloji', 'Astronomi', 'Bilim Sohbeti', 'Deney', 'Diğer'],
   tartisma: ['Güncel', 'Felsefe', 'Politika', 'Tarih', 'Toplumsal', 'Forum', 'Panel', 'Diğer'],
-  diger: ['Diğer'],
+  diger: ['Diğer','Gönüllülük','Topluluk Etkinliği', 'Karma Etkinlik','Açık Mikrofon','Networking','Mentorluk','Lansman','Karma Workshop','Hobi','Eğlence','Sürpriz Etkinlik','Yılbaşı / Bayram',],
 };
 
 
@@ -60,12 +71,12 @@ export default function CreateIndividualEventScreen({ navigation }) {
     { name: ' Kitap', icon: '📚' },
     { name: ' Oyun', icon: '🎮' },
     { name: ' Müzik', icon: '🎵' },
-    { name: ' Doğa', icon: '��' },
-    { name: ' Seyahat', icon: '✈️' },
+    { name: ' Doğa', icon: '  ' },
+    { name: ' Seyahat', icon: '✈' },
     { name: ' Yemek', icon: '🍳' },
     { name: ' Kişisel Gelişim', icon: '🧘' },
     { name: ' Bilim', icon: '🧪' },
-    { name: ' Tartışma', icon: '🗣️' },
+    { name: ' Tartışma', icon: '🗣' },
     { name: ' Diğer', icon: '🔗' },
   ]);
   const [cities, setCities] = useState([]);
@@ -194,12 +205,7 @@ export default function CreateIndividualEventScreen({ navigation }) {
 
   useEffect(() => {
     const fetchEvents = async () => {
-      // const userId = await getCurrentUserId();
       const response = await axios.get(`${API_BASE_URL}/events`);
-      // const myCreatedEvents = response.data.filter(
-      //   event => String(event.creator_id) === String(userId)
-      // );
-      // setCreatedEvents(myCreatedEvents);
       setCreatedEvents(response.data); // Tüm etkinlikleri göster
     };
     fetchEvents();
@@ -436,32 +442,32 @@ export default function CreateIndividualEventScreen({ navigation }) {
           ))}
         </View>
       </View>
-      {selectedCategory && SUBCATEGORIES[selectedCategory.name.toLowerCase().replace(/[^a-z0-9]/gi, '')] && (
-        <View style={{ marginBottom: 20 }}>
-          <Text style={styles.label}>Alt Kategori Seç *</Text>
-          <View style={styles.categoryContainer}>
-            {SUBCATEGORIES[selectedCategory.name.toLowerCase().replace(/[^a-z0-9]/gi, '')].map((sub, idx) => (
-              <TouchableOpacity
-                key={sub}
-                style={[
-                  styles.categoryButton,
-                  selectedSubcategory === sub && styles.categorySelected,
-                ]}
-                onPress={() => setSelectedSubcategory(sub)}
-              >
-                <Text
-                  style={[
-                    styles.categoryText,
-                    selectedSubcategory === sub && styles.categoryTextSelected,
-                  ]}
-                >
-                  {sub}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      )}
+      {selectedCategory && SUBCATEGORIES[cleanCategoryName(selectedCategory.name)] && (
+  <View style={{ marginBottom: 20 }}>
+    <Text style={styles.label}>Alt Kategori Seç *</Text>
+    <View style={styles.categoryContainer}>
+      {SUBCATEGORIES[cleanCategoryName(selectedCategory.name)].map((sub) => (
+        <TouchableOpacity
+          key={sub}
+          style={[
+            styles.categoryButton,
+            selectedSubcategory === sub && styles.categorySelected,
+          ]}
+          onPress={() => setSelectedSubcategory(sub)}
+        >
+          <Text
+            style={[
+              styles.categoryText,
+              selectedSubcategory === sub && styles.categoryTextSelected,
+            ]}
+          >
+            {sub}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  </View>
+)}
       {/* Görsel Seçim Modalı */}
       <Modal
         visible={imageModalVisible}
@@ -485,7 +491,7 @@ export default function CreateIndividualEventScreen({ navigation }) {
       <TouchableOpacity style={styles.selectButton} onPress={() => setClubModalVisible(true)}>
         {selectedClub ? (
           <Text style={{ color: '#222', fontWeight: '600' }}>
-            🏛️  {selectedClub.name}
+            🏛  {selectedClub.name}
           </Text>
         ) : (
           <Text style={{ color: '#888', fontWeight: '600', flexDirection: 'row', alignItems: 'center' }}>
@@ -517,7 +523,7 @@ export default function CreateIndividualEventScreen({ navigation }) {
                       setClubModalVisible(false);
                     }}
                   >
-                    <Text style={{ fontSize: 22, marginRight: 12 }}>🏛️</Text>
+                    <Text style={{ fontSize: 22, marginRight: 12 }}>🏛</Text>
                     <Text style={{ color: '#222', fontWeight: '700', fontSize: 16 }}>{item.name}</Text>
                   </TouchableOpacity>
                 )}
